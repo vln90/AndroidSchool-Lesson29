@@ -4,6 +4,7 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
@@ -13,19 +14,50 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE = 101;
     private static final String TAG = "MainActivity";
+
+    private LocationManager mLocationManager;
+
+    private MainLocationListener mMainLocationListener = new MainLocationListener();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+        if (requestCode == REQUEST_CODE) {
+            if (grantResults.length > 1) {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
+                    startLocationService();
+                } else {
+                    finish();
+                }
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
         checkPermission();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        mLocationManager.removeUpdates(mMainLocationListener);
     }
 
     private void checkPermission() {
@@ -45,41 +77,31 @@ public class MainActivity extends AppCompatActivity {
                 REQUEST_CODE);
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
-        if (requestCode == REQUEST_CODE) {
-            if (grantResults.length > 1) {
-                if (grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED) {
-                    startLocationService();
-                } else {
-                    finish();
-                }
-            }
-        }
-    }
-
     @SuppressLint("MissingPermission")
     private void startLocationService() {
-        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, mMainLocationListener);
+    }
 
-        List<String> providers = locationManager.getProviders(true);
-        Location bestLocation = null;
+    private static class MainLocationListener implements LocationListener {
 
-        for (String provider : providers) {
-            Location location = locationManager.getLastKnownLocation(provider);
-            if (location == null) {
-                continue;
-            }
-
-            if (bestLocation == null || location.getAccuracy() < bestLocation.getAccuracy()) {
-                bestLocation = location;
-            }
+        @Override
+        public void onLocationChanged(Location location) {
+            Log.d(TAG, "onLocationChanged() called with: location = [" + location + "]");
         }
 
-        Log.i(TAG, "Latitude = " + bestLocation.getLatitude());
-        Log.i(TAG, "Longitude = " + bestLocation.getLongitude());
-        Log.i(TAG, "Provider = " + bestLocation.getProvider());
+        @Override
+        public void onStatusChanged(String s, int i, Bundle bundle) {
+            Log.d(TAG, "onStatusChanged() called with: s = [" + s + "], i = [" + i + "], bundle = [" + bundle + "]");
+        }
+
+        @Override
+        public void onProviderEnabled(String s) {
+            Log.d(TAG, "onProviderEnabled() called with: s = [" + s + "]");
+        }
+
+        @Override
+        public void onProviderDisabled(String s) {
+            Log.d(TAG, "onProviderDisabled() called with: s = [" + s + "]");
+        }
     }
 }
