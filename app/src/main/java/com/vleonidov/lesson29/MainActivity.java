@@ -2,10 +2,10 @@ package com.vleonidov.lesson29;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.Dialog;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -14,21 +14,36 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnSuccessListener;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE = 101;
     private static final String TAG = "MainActivity";
 
-    private LocationManager mLocationManager;
-
-    private MainLocationListener mMainLocationListener = new MainLocationListener();
+    private FusedLocationProviderClient mFusedLocationProviderClient;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+    }
 
-        mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        checkGooglePlayServices();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
     }
 
     @Override
@@ -46,18 +61,24 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
+    private void checkGooglePlayServices() {
+        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
 
-        checkPermission();
-    }
+        int statusCode = googleApiAvailability.isGooglePlayServicesAvailable(this);
 
-    @Override
-    protected void onPause() {
-        super.onPause();
+        if (statusCode != ConnectionResult.SUCCESS) {
+            Dialog errorDialog = googleApiAvailability.getErrorDialog(this, statusCode,
+                    0, new DialogInterface.OnCancelListener() {
+                        @Override
+                        public void onCancel(DialogInterface dialogInterface) {
+                            finish();
+                        }
+                    });
 
-        mLocationManager.removeUpdates(mMainLocationListener);
+            errorDialog.show();
+        } else {
+            checkPermission();
+        }
     }
 
     private void checkPermission() {
@@ -79,29 +100,16 @@ public class MainActivity extends AppCompatActivity {
 
     @SuppressLint("MissingPermission")
     private void startLocationService() {
-        mLocationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, mMainLocationListener);
+        mFusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+
+        mFusedLocationProviderClient.getLastLocation()
+                .addOnSuccessListener(new OnSuccessListener<Location>() {
+                    @Override
+                    public void onSuccess(Location location) {
+                        Log.d(TAG, "onSuccess() called with: location = [" + location + "]");
+                    }
+                });
     }
 
-    private static class MainLocationListener implements LocationListener {
 
-        @Override
-        public void onLocationChanged(Location location) {
-            Log.d(TAG, "onLocationChanged() called with: location = [" + location + "]");
-        }
-
-        @Override
-        public void onStatusChanged(String s, int i, Bundle bundle) {
-            Log.d(TAG, "onStatusChanged() called with: s = [" + s + "], i = [" + i + "], bundle = [" + bundle + "]");
-        }
-
-        @Override
-        public void onProviderEnabled(String s) {
-            Log.d(TAG, "onProviderEnabled() called with: s = [" + s + "]");
-        }
-
-        @Override
-        public void onProviderDisabled(String s) {
-            Log.d(TAG, "onProviderDisabled() called with: s = [" + s + "]");
-        }
-    }
 }
