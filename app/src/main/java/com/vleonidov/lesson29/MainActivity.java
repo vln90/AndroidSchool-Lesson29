@@ -8,7 +8,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
+import android.location.Address;
+import android.location.Geocoder;
 import android.location.Location;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -33,6 +36,11 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE = 101;
@@ -44,10 +52,14 @@ public class MainActivity extends AppCompatActivity {
 
     private LocationCallback mLocationCallback = new MainLocationCallback();
 
+    private Geocoder mGeocoder;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        mGeocoder = new Geocoder(this, Locale.getDefault());
     }
 
     @Override
@@ -185,7 +197,41 @@ public class MainActivity extends AppCompatActivity {
         return locationRequest;
     }
 
-    private static class MainLocationCallback extends LocationCallback {
+    private static class GeocodingAsyncTask extends AsyncTask<Location, Void, List<Address>> {
+
+        private final Geocoder mGeocoder;
+
+        private GeocodingAsyncTask(Geocoder geocoder) {
+            mGeocoder = geocoder;
+        }
+
+        @Override
+        protected List<Address> doInBackground(Location... locations) {
+            Location location = locations[0];
+
+            try {
+                List<Address> addressList = mGeocoder.getFromLocation(location.getLatitude(),
+                        location.getLongitude(), 100);
+
+                return addressList;
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            return new ArrayList<>();
+        }
+
+        @Override
+        protected void onPostExecute(List<Address> addressList) {
+            super.onPostExecute(addressList);
+
+            for (Address address : addressList) {
+                Log.i(TAG, "Address = " + address);
+            }
+        }
+    }
+
+    private class MainLocationCallback extends LocationCallback {
         @Override
         public void onLocationResult(LocationResult locationResult) {
             Log.d(TAG, "onLocationResult() called with: locationResult = [" + locationResult + "]");
@@ -196,6 +242,9 @@ public class MainActivity extends AppCompatActivity {
 
             for (Location location : locationResult.getLocations()) {
                 Log.i(TAG, "Location from LocationResuls = " + location);
+
+                GeocodingAsyncTask geocodingAsyncTask = new GeocodingAsyncTask(mGeocoder);
+                geocodingAsyncTask.execute(location);
             }
         }
 
